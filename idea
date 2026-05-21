@@ -1,0 +1,31 @@
+[Your Client: cURL/Postman] 
+       │
+       ▼ (Hits localhost:8080)
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. GO GATEWAY ENGINE                                                  │
+│    • Receives request.                                                 │
+│    • Calls tiktoken locally to calculate token size.                   │
+└──────┬─────────────────────────────────────────────────────────────────┘
+       │
+       ├─► [2. Local Redis: 6379] ──► Checks Sorted Set for Rate Limit.
+       │
+       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 3. EMBEDDING GENERATION                                                │
+│    • Gateway sends prompt text to Ollama (localhost:11434/api/embeddings)│
+│    • Ollama returns a mathematical vector representation.              │
+└──────┬─────────────────────────────────────────────────────────────────┘
+       │
+       ├─► [4. Local Redis: 6379] ──► Runs FT.SEARCH (Vector Similarity).
+       │                              Is there a match > 95%?
+       │
+       ├───► [CACHE HIT] ──► Returns saved response instantly to client (~2ms).
+       │
+       └───► [CACHE MISS] ──► Goes to Step 5.
+       ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 5. LOCAL LLM INFERENCE & UPDATE                                        │
+│    • Gateway calls Ollama (localhost:11434/v1/chat/completions).       │
+│    • Llama3 processes text and streams response back.                  │
+│    • Async Go routine writes Text + Embedding Vector back into Redis.  │
+└────────────────────────────────────────────────────────────────────────┘
